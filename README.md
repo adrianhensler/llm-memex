@@ -71,7 +71,7 @@ conversations.json  (ChatGPT/Claude export — immutable raw source)
 ```bash
 git clone https://github.com/adrianhensler/llm-memex
 cd llm-memex
-uv sync   # or: pip install -r requirements.txt
+pip install -r requirements.txt   # or: uv pip install -r requirements.txt
 export ANTHROPIC_API_KEY=your_key_here
 ```
 
