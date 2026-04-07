@@ -18,19 +18,21 @@ Point an agent at this repo with your `conversations.json` export and it will bu
 
 ---
 
-## Foundation: Karpathy's LLM Wiki Pattern
+## Inspiration: Karpathy's LLM Wiki Idea
 
-This project applies [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) to a source most people already have: their own LLM conversation history.
+Inspired by [a gist from Andrej Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) describing a concept for LLM-assisted personal knowledge management. His core insight:
 
-His pattern has three layers, mapped here as:
+> The tedious part of maintaining a knowledge base is the bookkeeping — updating references, maintaining consistency — which causes humans to abandon wikis. LLMs don't get bored and can touch 15 files simultaneously, making maintenance nearly cost-free.
 
-| Karpathy Layer | This Project | Description |
+He sketches three layers — raw sources, a schema file, and an LLM-generated wiki — as a conceptual pattern. This project takes that idea and builds a full implementation around a specific data source he never mentions: your own LLM conversation history. The classification pipeline, web app, agentic improve loop, and open questions aggregation are all original.
+
+The structural mapping:
+
+| Karpathy Concept | This Project | Description |
 |---|---|---|
 | **Raw Sources** | `conversations.json` | Immutable export — never modified |
 | **The Schema** | `schema.md` | Defines categories, page structure, conventions |
 | **The Wiki** | `wiki/` | LLM-generated markdown, lives alongside sources |
-
-The key insight from the pattern: LLMs remove the bookkeeping friction that causes humans to abandon wikis. Updates are resume-safe and incremental — classify once, ingest in batches, improve selectively. The wiki compounds over time.
 
 ---
 
@@ -705,6 +707,6 @@ A clean pipeline run (classify + ingest + dedup, no interactive improvements) co
 
 ## Credits
 
-- [Andrej Karpathy's LLM Wiki gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — the pattern this is built on
+- [Andrej Karpathy's LLM Wiki gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — the idea that sparked this
 - [Anthropic Claude](https://anthropic.com) — classification, synthesis, improvement
 - [Flask](https://flask.palletsprojects.com/), [Bootstrap 5](https://getbootstrap.com/), [markdown2](https://github.com/trentm/python-markdown2)

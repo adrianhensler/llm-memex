@@ -12,18 +12,13 @@ I spent a couple of days turning that into a structured personal knowledge wiki.
 
 ---
 
-## The Core Idea: Karpathy's LLM Wiki Pattern
+## The Starting Point: A Karpathy Gist
 
-The whole thing is built around [a pattern described by Andrej Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f). His insight is simple but powerful:
+The spark was [a short gist from Andrej Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) sketching a concept for LLM-assisted personal knowledge management. His core insight:
 
 > The tedious part of maintaining a knowledge base is the bookkeeping — updating references, maintaining consistency — which causes humans to abandon wikis. LLMs don't get bored and can touch 15 files simultaneously, making maintenance nearly cost-free.
 
-His pattern has three layers:
-1. **Raw Sources** — immutable documents as the source of truth
-2. **The Wiki** — LLM-generated markdown organized by concept, with cross-references
-3. **The Schema** — a configuration file documenting wiki structure and conventions
-
-I applied this to a source most people already have: their own ChatGPT conversation history.
+He describes three conceptual layers — raw sources, a schema file, and an LLM-generated wiki — but leaves the implementation as an exercise. The data source, the classification pipeline, the web app, the agentic improve loop — none of that is in the gist. This is one way to build it out, applied to a source most people already have: their own LLM conversation history.
 
 ---
 
