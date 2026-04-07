@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Dashboard</h2>
+
+{% set cs = stats.get('conversations', {}) %}
+{% set cls = stats.get('classification', {}) %}
+{% set ws = stats.get('wiki', {}) %}
+
+<!-- Key metrics -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ "{:,}".format(cs.get('total', 0)) }}</div>
+            <div class="stat-label">Conversations</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ "{:,}".format(cs.get('message_counts', {}).get('total', 0)) }}</div>
+            <div class="stat-label">Total Messages</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ "{:,}".format(cls.get('eligible_for_wiki', 0)) }}</div>
+            <div class="stat-label">Wiki-eligible</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ ws.get('total_pages', 0) }}</div>
+            <div class="stat-label">Wiki Pages</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ "{:,}".format(cs.get('length_chars', {}).get('total_estimated_tokens', 0)) }}</div>
+            <div class="stat-label">Est. Tokens</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ cs.get('message_counts', {}).get('mean', 0) }}</div>
+            <div class="stat-label">Avg Msgs/Convo</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ cls.get('sensitive_pct', 0) }}%</div>
+            <div class="stat-label">Sensitive</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ "{:,}".format(ws.get('total_words', 0)) }}</div>
+            <div class="stat-label">Wiki Words</div>
+        </div>
+    </div>
+</div>
+
+<!-- Date range -->
+{% if cs.get('date_range') %}
+<p class="text-muted mb-4">
+    Data spans <strong>{{ cs.date_range.start }}</strong> → <strong>{{ cs.date_range.end }}</strong>
+</p>
+{% endif %}
+
+<div class="row g-4 mb-4">
+    <!-- Activity by month -->
+    <div class="col-md-8">
+        <div class="card p-3">
+            <h6 class="mb-3">Activity by Month</h6>
+            <canvas id="monthChart" height="100"></canvas>
+        </div>
+    </div>
+    <!-- Category pie -->
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="mb-3">By Category</h6>
+            <canvas id="catChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Top topics -->
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6 class="mb-3">Top Topics</h6>
+            <canvas id="topicChart" height="200"></canvas>
+        </div>
+    </div>
+    <!-- Models used -->
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6 class="mb-3">Models Used</h6>
+            <canvas id="modelChart" height="200"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Value distribution -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="mb-3">Value Score Distribution</h6>
+            <canvas id="valueChart"></canvas>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="mb-3">By Day of Week</h6>
+            <canvas id="weekdayChart"></canvas>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="mb-3">By Hour of Day</h6>
+            <canvas id="hourChart"></canvas>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STATS = {{ stats | tojson }};
+const cs = STATS.conversations || {};
+const cls = STATS.classification || {};
+const ws = STATS.wiki || {};
+
+const COLORS = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f','#edc948','#b07aa1','#ff9da7'];
+
+// Month activity
+const monthData = cs.by_month || {};
+const monthLabels = Object.keys(monthData);
+const monthValues = Object.values(monthData);
+new Chart(document.getElementById('monthChart'), {
+    type: 'bar',
+    data: { labels: monthLabels, datasets: [{ label: 'Conversations', data: monthValues, backgroundColor: '#4e79a7', borderRadius: 2 }] },
+    options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { maxRotation: 45, font: { size: 10 } } } } }
+});
+
+// Category pie
+const catData = cls.by_category || {};
+new Chart(document.getElementById('catChart'), {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(catData),
+        datasets: [{ data: Object.values(catData), backgroundColor: COLORS }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+});
+
+// Top topics
+const topicData = cls.top_topics || {};
+const topTopics = Object.entries(topicData).slice(0, 20);
+new Chart(document.getElementById('topicChart'), {
+    type: 'bar',
+    data: {
+        labels: topTopics.map(([k]) => k),
+        datasets: [{ data: topTopics.map(([,v]) => v), backgroundColor: '#59a14f', borderRadius: 2 }]
+    },
+    options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 10 } } } }
+    }
+});
+
+// Models
+const modelData = cs.models_used || {};
+const topModels = Object.entries(modelData).slice(0, 10);
+new Chart(document.getElementById('modelChart'), {
+    type: 'bar',
+    data: {
+        labels: topModels.map(([k]) => k.replace('gpt-', 'gpt-').substring(0, 20)),
+        datasets: [{ data: topModels.map(([,v]) => v), backgroundColor: '#f28e2b', borderRadius: 2 }]
+    },
+    options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { y: { ticks: { font: { size: 10 } } } }
+    }
+});
+
+// Value distribution
+const valueData = cls.by_value || {};
+new Chart(document.getElementById('valueChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(valueData).map(v => 'Score ' + v),
+        datasets: [{ data: Object.values(valueData), backgroundColor: COLORS, borderRadius: 3 }]
+    },
+    options: { plugins: { legend: { display: false } } }
+});
+
+// Weekday
+const wdOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const wdData = cs.by_weekday || {};
+new Chart(document.getElementById('weekdayChart'), {
+    type: 'bar',
+    data: {
+        labels: wdOrder.map(d => d.substring(0,3)),
+        datasets: [{ data: wdOrder.map(d => wdData[d] || 0), backgroundColor: '#76b7b2', borderRadius: 3 }]
+    },
+    options: { plugins: { legend: { display: false } } }
+});
+
+// Hour
+const hourData = cs.by_hour || {};
+new Chart(document.getElementById('hourChart'), {
+    type: 'bar',
+    data: {
+        labels: Array.from({length:24}, (_,i) => i + 'h'),
+        datasets: [{ data: Array.from({length:24}, (_,i) => hourData[String(i)] || 0), backgroundColor: '#b07aa1', borderRadius: 2 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 9 } } } } }
+});
+</script>
+{% endblock %}

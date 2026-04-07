@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Wiki{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0 text-capitalize">{{ cat }}</h2>
+    <span class="text-muted">
+        {% if active_prefix %}{{ cat_pages|length }} / {% endif %}{{ total_count }} pages
+    </span>
+</div>
+
+<!-- Prefix filter chips -->
+{% if grouped %}
+<div class="mb-3 d-flex flex-wrap gap-1">
+    <a href="/wiki/category/{{ cat }}"
+       class="badge text-decoration-none {% if not active_prefix %}bg-primary{% else %}bg-secondary{% endif %}">
+        All ({{ total_count }})
+    </a>
+    {% for prefix, grp in grouped.items() %}
+    <a href="/wiki/category/{{ cat }}?prefix={{ prefix }}"
+       class="badge text-decoration-none {% if active_prefix == prefix %}bg-primary{% else %}bg-secondary{% endif %}">
+        {{ prefix }} ({{ grp|length }})
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if active_prefix %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/wiki/category/{{ cat }}">{{ cat }}</a></li>
+        <li class="breadcrumb-item active">{{ active_prefix }}</li>
+    </ol>
+</nav>
+{% endif %}
+
+{% if cat_pages %}
+<div class="row g-2">
+    {% for p in cat_pages %}
+    <div class="col-md-3 col-sm-4">
+        <a href="/wiki/{{ p.path }}" class="card page-card text-decoration-none h-100">
+            <div class="card-body py-2 px-3">
+                <div class="fw-medium" style="font-size:0.9rem">{{ p.name }}</div>
+                <small class="text-muted">{{ p.size }} words</small>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-secondary">No pages found.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Improve Result — {{ title }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 1100px">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/wiki">Wiki</a></li>
+            <li class="breadcrumb-item"><a href="/wiki/{{ page }}">{{ title }}</a></li>
+            <li class="breadcrumb-item active">Review improvement</li>
+        </ol>
+    </nav>
+
+    <h3 class="mb-1">Review improvement: {{ title }}</h3>
+    <p class="text-muted small mb-4">Compare the original and improved versions. Accept to save, or discard to keep the original.</p>
+
+    <!-- Accept / Discard actions -->
+    <div class="d-flex gap-2 mb-4">
+        <form method="post" action="/wiki/{{ page }}/improve/accept">
+            <button type="submit" class="btn btn-success">
+                ✓ Accept &amp; replace
+            </button>
+        </form>
+        <form method="post" action="/wiki/{{ page }}/improve/discard">
+            <button type="submit" class="btn btn-outline-danger">
+                ✗ Discard
+            </button>
+        </form>
+        <a href="/wiki/{{ page }}/improve" class="btn btn-outline-secondary ms-2">
+            ← Edit prompt &amp; re-run
+        </a>
+    </div>
+
+    <!-- Tab switcher -->
+    <ul class="nav nav-tabs mb-0" id="diffTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="side-tab" data-bs-toggle="tab"
+                    data-bs-target="#side-by-side" type="button" role="tab">
+                Side by side
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="improved-tab" data-bs-toggle="tab"
+                    data-bs-target="#improved-only" type="button" role="tab">
+                Improved
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="original-tab" data-bs-toggle="tab"
+                    data-bs-target="#original-only" type="button" role="tab">
+                Original
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="raw-tab" data-bs-toggle="tab"
+                    data-bs-target="#raw-markdown" type="button" role="tab">
+                Raw markdown
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white">
+        <!-- Side by side -->
+        <div class="tab-pane fade show active" id="side-by-side" role="tabpanel">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="text-muted small fw-medium mb-2 border-bottom pb-1">Original</div>
+                    <div class="wiki-content" style="font-size: 0.9rem">{{ original | safe }}</div>
+                </div>
+                <div class="col-md-6 border-start">
+                    <div class="text-success small fw-medium mb-2 border-bottom pb-1">Improved</div>
+                    <div class="wiki-content" style="font-size: 0.9rem">{{ improved | safe }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Improved only -->
+        <div class="tab-pane fade" id="improved-only" role="tabpanel">
+            <div class="wiki-content">{{ improved | safe }}</div>
+        </div>
+
+        <!-- Original only -->
+        <div class="tab-pane fade" id="original-only" role="tabpanel">
+            <div class="wiki-content">{{ original | safe }}</div>
+        </div>
+
+        <!-- Raw markdown -->
+        <div class="tab-pane fade" id="raw-markdown" role="tabpanel">
+            <pre style="font-size: 0.8rem; white-space: pre-wrap; word-break: break-word">{{ improved_raw | e }}</pre>
+        </div>
+    </div>
+
+    <!-- Repeat actions at bottom -->
+    <div class="d-flex gap-2 mt-4">
+        <form method="post" action="/wiki/{{ page }}/improve/accept">
+            <button type="submit" class="btn btn-success">
+                ✓ Accept &amp; replace
+            </button>
+        </form>
+        <form method="post" action="/wiki/{{ page }}/improve/discard">
+            <button type="submit" class="btn btn-outline-danger">
+                ✗ Discard
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

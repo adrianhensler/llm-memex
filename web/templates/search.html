@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Search{% if q %}: <em>{{ q }}</em>{% endif %}</h2>
+
+{% if q %}
+<p class="text-muted">
+    {{ results|length }} result(s){% if by_cat %} across {{ by_cat|length }} categories{% endif %}
+</p>
+
+{% if by_cat %}
+{% for cat, cat_results in by_cat.items() %}
+<h6 class="text-muted text-uppercase mt-4 mb-2"
+    style="font-size:0.75rem;letter-spacing:0.05em;border-bottom:1px solid #eee;padding-bottom:4px">
+    {{ cat }} — {{ cat_results|length }}
+</h6>
+{% for r in cat_results %}
+<div class="card mb-2 p-3">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <a href="/wiki/{{ r.path }}" class="fw-medium text-decoration-none">{{ r.name }}</a>
+        <div class="d-flex gap-1 align-items-center">
+            {% if r.title_match %}
+            <span class="badge bg-primary" style="font-size:0.65rem">title</span>
+            {% endif %}
+            <span class="badge bg-secondary">{{ r.category }}</span>
+        </div>
+    </div>
+    <p class="text-muted small mb-0">…{{ r.snippet | safe }}…</p>
+</div>
+{% endfor %}
+{% endfor %}
+{% else %}
+<div class="alert alert-secondary">No results found for <strong>{{ q }}</strong>.</div>
+{% endif %}
+{% endif %}
+{% endblock %}

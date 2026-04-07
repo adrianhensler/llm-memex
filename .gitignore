@@ -1,0 +1,28 @@
+# Personal data — never commit
+conversations.json
+classified.jsonl
+classify_run.log
+ingest_run.log
+questions_notes.json
+
+# Generated outputs
+wiki/
+personal/
+stats/
+*.bak
+
+# Stellaris comic (separate project)
+stellaris/
+stellaris_comic.md
+short_story_example.md
+exporting_more_from_chatgpt.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Editor
+.DS_Store
+*.swp

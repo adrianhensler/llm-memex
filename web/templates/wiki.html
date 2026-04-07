@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% if content %}
+{% if toc %}
+<div class="d-flex gap-4">
+    <div class="wiki-content flex-grow-1 min-width-0">
+        {{ content | safe }}
+    </div>
+    <div class="d-none d-xl-block flex-shrink-0" style="width:220px">
+        <div class="sticky-top pt-2" style="top:1rem; font-size:0.8rem">
+            <div class="text-muted fw-semibold text-uppercase mb-2" style="font-size:0.7rem; letter-spacing:.05em">On this page</div>
+            <div class="wiki-toc">{{ toc | safe }}</div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="wiki-content">
+    {{ content | safe }}
+</div>
+{% endif %}
+{% if see_also %}
+<div class="see-also mt-4 pt-3 border-top">
+    <small class="text-muted fw-semibold me-2">See also:</small>
+    {% for p in see_also %}
+    <a href="/wiki/{{ p.path }}" class="badge bg-secondary text-decoration-none me-1 fw-normal">
+        {{ p.path.split('/')[0] }}/{{ p.name }}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+{% if page and not page.startswith('personal/') %}
+<div class="mt-4 border-top pt-3">
+    <a href="/wiki/{{ page }}/improve" class="btn btn-sm btn-outline-secondary">
+        ✨ Improve this page
+    </a>
+</div>
+{% endif %}
+{% else %}
+<h2 class="mb-4">Wiki</h2>
+{% if pages %}
+{% for cat, cat_pages in pages.items() %}
+<div class="mb-4">
+    <h5 class="text-capitalize border-bottom pb-1 d-flex justify-content-between align-items-center">
+        <a href="/wiki/category/{{ cat }}" class="text-decoration-none text-dark">{{ cat }}</a>
+        <a href="/wiki/category/{{ cat }}" class="text-muted small fw-normal">{{ cat_pages|length }} pages →</a>
+    </h5>
+    <div class="row g-2">
+        {% for p in cat_pages[:12] %}
+        <div class="col-md-4">
+            <a href="/wiki/{{ p.path }}" class="card page-card text-decoration-none">
+                <div class="card-body py-2 px-3">
+                    <div class="fw-medium">{{ p.name }}</div>
+                    <small class="text-muted">{{ p.size }} words</small>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+        {% if cat_pages|length > 12 %}
+        <div class="col-12">
+            <a href="/wiki/category/{{ cat }}" class="text-muted small">View all {{ cat_pages|length }} pages in {{ cat }} →</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="alert alert-info">No wiki pages yet. Run <code>python3 ingest.py</code> to build the wiki.</div>
+{% endif %}
+{% endif %}
+{% endblock %}

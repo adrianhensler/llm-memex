@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Open Questions{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="mb-0">Open Questions</h2>
+    <span class="text-muted">{{ total }} questions across {{ by_cat|length }} categories</span>
+</div>
+<p class="text-muted small mb-4">Questions extracted from every wiki page. Click ✏️ to add your own thoughts — notes are yours alone, never touched by AI.</p>
+
+<!-- Search -->
+<div class="mb-4">
+    <input type="text" id="q-search" class="form-control" placeholder="Filter questions…" style="max-width:480px">
+</div>
+
+<!-- Feed: recently updated -->
+<div class="mb-5">
+    <div class="d-flex align-items-center mb-2 gap-2">
+        <h5 class="mb-0">Recently updated</h5>
+        <button class="btn btn-sm btn-link text-muted p-0" data-bs-toggle="collapse" data-bs-target="#feed-body">toggle</button>
+    </div>
+    <div id="feed-body" class="collapse show">
+        <div class="row g-2">
+        {% for q in feed %}
+        <div class="col-12 q-item" data-text="{{ q.text | lower }}">
+            <div class="q-card p-2 px-3 rounded border d-flex justify-content-between align-items-start gap-3">
+                <div class="flex-grow-1">
+                    <div class="q-text mb-1">{{ q.text }}</div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <a href="/wiki/{{ q.page_path }}" class="text-muted small text-decoration-none q-source">
+                            {{ q.category }}/{{ q.page_name }}
+                        </a>
+                        <span class="text-muted small">· {{ q.modified_fmt }}</span>
+                        {% if q.note %}
+                        <span class="badge bg-light text-dark border small fw-normal">note</span>
+                        {% endif %}
+                    </div>
+                    <div class="q-note-display mt-1 {% if not q.note %}d-none{% endif %}" id="note-display-{{ q.id }}">
+                        <div class="q-note-text text-secondary small fst-italic">{{ q.note }}</div>
+                    </div>
+                    <div class="q-note-editor mt-1 d-none" id="note-editor-{{ q.id }}">
+                        <textarea class="form-control form-control-sm q-note-input" rows="2"
+                                  placeholder="Your thoughts…"
+                                  data-qid="{{ q.id }}">{{ q.note }}</textarea>
+                        <div class="text-muted" style="font-size:0.7rem;margin-top:2px">Saves on blur · Leave empty to delete</div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-link text-muted p-0 q-edit-btn flex-shrink-0"
+                        data-qid="{{ q.id }}" title="Add note" style="font-size:0.85rem">✏️</button>
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- By category -->
+{% for cat, cat_qs in by_cat.items() %}
+<div class="mb-4 q-section">
+    <div class="d-flex align-items-center mb-2 gap-2">
+        <h5 class="mb-0 text-capitalize">{{ cat }}</h5>
+        <span class="text-muted small">({{ cat_qs|length }})</span>
+        <button class="btn btn-sm btn-link text-muted p-0" data-bs-toggle="collapse"
+                data-bs-target="#cat-{{ cat }}">toggle</button>
+    </div>
+    <div id="cat-{{ cat }}" class="collapse show">
+        <div class="row g-2">
+        {% for q in cat_qs %}
+        <div class="col-12 q-item" data-text="{{ q.text | lower }}">
+            <div class="q-card p-2 px-3 rounded border d-flex justify-content-between align-items-start gap-3">
+                <div class="flex-grow-1">
+                    <div class="q-text mb-1">{{ q.text }}</div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <a href="/wiki/{{ q.page_path }}" class="text-muted small text-decoration-none q-source">
+                            {{ q.page_name }}
+                        </a>
+                        {% if q.note %}
+                        <span class="badge bg-light text-dark border small fw-normal">note</span>
+                        {% endif %}
+                    </div>
+                    <div class="q-note-display mt-1 {% if not q.note %}d-none{% endif %}" id="note-display-{{ q.id }}">
+                        <div class="q-note-text text-secondary small fst-italic">{{ q.note }}</div>
+                    </div>
+                    <div class="q-note-editor mt-1 d-none" id="note-editor-{{ q.id }}">
+                        <textarea class="form-control form-control-sm q-note-input" rows="2"
+                                  placeholder="Your thoughts…"
+                                  data-qid="{{ q.id }}">{{ q.note }}</textarea>
+                        <div class="text-muted" style="font-size:0.7rem;margin-top:2px">Saves on blur · Leave empty to delete</div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-link text-muted p-0 q-edit-btn flex-shrink-0"
+                        data-qid="{{ q.id }}" title="Add note" style="font-size:0.85rem">✏️</button>
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Search / filter
+const searchInput = document.getElementById('q-search');
+searchInput.addEventListener('input', function() {
+    const q = this.value.toLowerCase().trim();
+    document.querySelectorAll('.q-item').forEach(el => {
+        const text = el.dataset.text || '';
+        const source = el.querySelector('.q-source')?.textContent?.toLowerCase() || '';
+        el.style.display = (!q || text.includes(q) || source.includes(q)) ? '' : 'none';
+    });
+    // Show all category sections when searching
+    if (q) {
+        document.querySelectorAll('.q-section .collapse').forEach(el => {
+            el.classList.add('show');
+        });
+    }
+});
+
+// Inline note editing
+document.querySelectorAll('.q-edit-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const qid = this.dataset.qid;
+        const editor = document.getElementById('note-editor-' + qid);
+        const display = document.getElementById('note-display-' + qid);
+        editor.classList.toggle('d-none');
+        if (!editor.classList.contains('d-none')) {
+            editor.querySelector('textarea').focus();
+            display.classList.add('d-none');
+        }
+    });
+});
+
+document.querySelectorAll('.q-note-input').forEach(ta => {
+    ta.addEventListener('blur', function() {
+        const qid = this.dataset.qid;
+        const note = this.value;
+        fetch('/questions/note', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `qid=${encodeURIComponent(qid)}&note=${encodeURIComponent(note)}`
+        });
+        // Update display
+        const display = document.getElementById('note-display-' + qid);
+        const noteText = display.querySelector('.q-note-text');
+        if (note.trim()) {
+            noteText.textContent = note.trim();
+            display.classList.remove('d-none');
+        } else {
+            display.classList.add('d-none');
+        }
+        document.getElementById('note-editor-' + qid).classList.add('d-none');
+    });
+
+    // Save on Ctrl+Enter / Cmd+Enter
+    ta.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            this.blur();
+        }
+    });
+});
+</script>
+{% endblock %}
