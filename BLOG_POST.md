@@ -227,6 +227,6 @@ Karpathy's framing is right: the hard part of maintaining a knowledge base has a
 
 ---
 
-*Full source code and detailed setup instructions: [github.com/adrianhensler/chatgpt-wiki-builder](https://github.com/adrianhensler/chatgpt-wiki-builder)*
+*Full source code and detailed setup instructions: [github.com/adrianhensler/llm-memex](https://github.com/adrianhensler/llm-memex)*
 
 *Built on [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).*

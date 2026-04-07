@@ -68,8 +68,8 @@ conversations.json (ChatGPT export)
 ### Install
 
 ```bash
-git clone https://github.com/adrianhensler/chatgpt-wiki-builder
-cd chatgpt-wiki-builder
+git clone https://github.com/adrianhensler/llm-memex
+cd llm-memex
 uv sync   # or: pip install -r requirements.txt
 ```
 
