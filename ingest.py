@@ -64,10 +64,18 @@ Update (or create) the wiki page for "{topic}" by integrating knowledge from the
 - Keep it concise but information-dense. This is a reference, not an essay.
 - Preserve existing content that's still relevant; update or remove stale claims.
 - Do NOT include sensitive personal details (health, relationships, specific names of people).
-- Write in third person about "the user" or use neutral phrasing.
 - Use the format from the schema (Summary, Key Points, Tools & Resources, Projects & Experiments, Open Questions, Related).
 - In "Tools & Resources": use markdown links `[Name](url)` for any external tools, papers, or frameworks. Use `[[Page Name]]` for internal cross-references to other wiki topics. Never list a resource as plain unlinked text.
 - In "Related": always use `[[Page Name]]` syntax for internal wiki links.
+
+## Voice and provenance — read carefully:
+Default to neutral framing that records what was explored, not what the user believes:
+- Prefer: "discussion explored X", "the topic of X was covered", "this area includes X"
+- Use "the user built/used/tried X" only for concrete actions evidenced in the conversation
+- Use "the user argues/believes X" only when the user stated it explicitly in first person
+- Never attribute an idea to the user if it came from an AI response or an external source being discussed
+- When uncertain who originated an idea, use "X was discussed" or "X emerged in discussion"
+- Open Questions should reflect genuine unresolved tensions from the conversations — not inferred curiosity
 
 Output ONLY the updated markdown content for the page. No explanation, no preamble."""
 
