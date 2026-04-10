@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Files{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Files</h2>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<!-- Upload form -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h6 class="card-title text-muted fw-semibold text-uppercase mb-3" style="font-size:0.75rem;letter-spacing:.05em">Upload File</h6>
+        <form method="post" action="/upload" enctype="multipart/form-data" class="d-flex gap-2 align-items-center flex-wrap">
+            <input type="file" name="file" class="form-control form-control-sm" style="max-width:340px"
+                   accept=".json,.jsonl,.md,.txt">
+            <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+            <small class="text-muted">.json (ChatGPT export) &nbsp;·&nbsp; .jsonl (classified) &nbsp;·&nbsp; .md (wiki page)</small>
+        </form>
+    </div>
+</div>
+
+<!-- Core pipeline files -->
+<h6 class="text-muted fw-semibold text-uppercase mb-2" style="font-size:0.75rem;letter-spacing:.05em">Pipeline Files</h6>
+<div class="table-responsive mb-4">
+    <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+            <tr><th>File</th><th>Size</th><th>Modified</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for f in core_files %}
+        <tr>
+            <td class="fw-medium">{{ f.name }}</td>
+            <td class="text-muted">{{ "%.1f"|format(f.size / 1048576) }} MB</td>
+            <td class="text-muted" style="font-size:0.85rem">{{ f.mtime.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td><span class="badge bg-secondary">core</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted">No pipeline files found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Uploaded files -->
+<h6 class="text-muted fw-semibold text-uppercase mb-2" style="font-size:0.75rem;letter-spacing:.05em">
+    Uploaded <span class="fw-normal text-muted">({{ uploaded|length }})</span>
+</h6>
+{% if uploaded %}
+<div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+            <tr><th>File</th><th>Type</th><th>Size</th><th>Uploaded</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for f in uploaded %}
+        {% set s = f.status %}
+        <tr class="{% if s == 'done' %}table-success{% elif s == 'error' %}table-danger{% elif s == 'running' %}table-info{% elif s == 'queued' %}table-warning{% endif %}">
+            <td class="fw-medium">{{ f.name }}</td>
+            <td>
+                {% if f.suffix == '.json' %}<span class="badge bg-info text-dark">json</span>
+                {% elif f.suffix == '.jsonl' %}<span class="badge bg-warning text-dark">jsonl</span>
+                {% elif f.suffix == '.md' %}<span class="badge bg-success">md</span>
+                {% else %}<span class="badge bg-secondary">{{ f.suffix }}</span>{% endif %}
+            </td>
+            <td class="text-muted">
+                {% if f.size > 1048576 %}{{ "%.1f"|format(f.size / 1048576) }} MB
+                {% else %}{{ "%.0f"|format(f.size / 1024) }} KB{% endif %}
+            </td>
+            <td class="text-muted" style="font-size:0.85rem">{{ f.mtime.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td>
+                {% if s == 'done' %}
+                    <span class="badge bg-success">✓ Done</span>
+                {% elif s == 'running' %}
+                    <span class="badge bg-primary">
+                        <span class="spinner-border spinner-border-sm me-1" style="width:.6rem;height:.6rem"></span>Running
+                    </span>
+                {% elif s == 'queued' %}
+                    <span class="badge bg-warning text-dark">Queued</span>
+                {% elif s == 'error' %}
+                    <span class="badge bg-danger" role="button" data-bs-toggle="collapse"
+                          data-bs-target="#log-{{ loop.index }}" style="cursor:pointer">✗ Error ▾</span>
+                {% else %}
+                    <span class="text-muted" style="font-size:0.8rem">—</span>
+                {% endif %}
+            </td>
+            <td class="d-flex gap-1 flex-wrap">
+                {% if s not in ('running', 'queued') and f.suffix in ('.json', '.jsonl', '.md') %}
+                <form method="post" action="/ingest/{{ f.name }}" class="d-inline">
+                    <button class="btn btn-sm btn-outline-primary py-0" style="font-size:0.75rem">
+                        {% if s == 'done' %}Re-ingest{% else %}Ingest{% endif %}
+                    </button>
+                </form>
+                {% endif %}
+                <a href="/uploads/{{ f.name }}" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.75rem">Download</a>
+            </td>
+        </tr>
+        {% if s == 'error' and f.status_log %}
+        <tr class="table-danger">
+            <td colspan="6" class="p-0">
+                <div id="log-{{ loop.index }}" class="collapse">
+                    <pre class="m-2 p-2 bg-dark text-light rounded" style="font-size:0.75rem;max-height:200px;overflow:auto">{{ f.status_log }}</pre>
+                </div>
+            </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if uploaded | selectattr('status', 'in', ['running', 'queued']) | list %}
+<!-- Auto-refresh while a job is running or queued -->
+<script>setTimeout(() => location.reload(), 3000);</script>
+{% endif %}
+
+{% else %}
+<p class="text-muted">No uploaded files yet.</p>
+{% endif %}
+{% endblock %}

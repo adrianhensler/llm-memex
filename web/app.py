@@ -13,13 +13,16 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
+import threading
 from pathlib import Path
 from collections import defaultdict
 
 import anthropic
 import markdown2
-from flask import Flask, render_template, request, abort, redirect, url_for, session
+from flask import Flask, render_template, request, abort, redirect, url_for, session, send_from_directory
+from werkzeug.utils import secure_filename
 
 BASE_DIR = Path(__file__).parent.parent
 WIKI_DIR = BASE_DIR / "wiki"
@@ -28,6 +31,9 @@ STATS_FILE = BASE_DIR / "stats" / "stats.json"
 CLASSIFIED_FILE = BASE_DIR / "classified.jsonl"
 CONVERSATIONS_FILE = BASE_DIR / "conversations.json"
 QUESTIONS_NOTES_FILE = BASE_DIR / "questions_notes.json"
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+ALLOWED_EXTENSIONS = {".json", ".jsonl", ".md", ".txt"}
 
 # Module-level caches for large source files (loaded once on first use)
 _classified_cache = None
@@ -155,7 +161,7 @@ def get_grouped_pages():
 
 
 def get_related_pages(page_path: str, all_pages: dict) -> list[dict]:
-    """Return related pages: exact-stem matches in other categories + same-prefix siblings."""
+    """Return related pages: [[wiki links]] in page + exact-stem matches in other categories + same-prefix siblings."""
     parts = page_path.split("/")
     if len(parts) < 2:
         return []
@@ -163,8 +169,28 @@ def get_related_pages(page_path: str, all_pages: dict) -> list[dict]:
     stem = re.sub(r'[-_]+', '_', parts[-1].lower())
     prefix = re.split(r'[_\-]', parts[-1])[0].lower()
 
+    # Build lookup for resolving [[links]]
+    lookup = _build_page_lookup(all_pages)
+
     related = []
     seen = {page_path}
+
+    # 1. Explicit [[wiki links]] in the page content
+    page_file = WIKI_DIR / (page_path + ".md")
+    if page_file.exists():
+        text = page_file.read_text()
+        for link_title in re.findall(r'\[\[([^\]]+)\]\]', text):
+            resolved = lookup.get(_normalize_link(link_title))
+            if resolved and resolved not in seen:
+                # Find the full page object
+                for cat_pages in all_pages.values():
+                    for p in cat_pages:
+                        if p['path'] == resolved:
+                            related.append({**p, 'relevance': 'linked'})
+                            seen.add(resolved)
+                            break
+
+    # 2. Exact stem match in other categories
     for cat, cat_pages in all_pages.items():
         for p in cat_pages:
             if p['path'] in seen:
@@ -179,7 +205,7 @@ def get_related_pages(page_path: str, all_pages: dict) -> list[dict]:
                 related.append({**p, 'relevance': 'sibling'})
                 seen.add(p['path'])
 
-    related.sort(key=lambda p: (0 if p['relevance'] == 'exact' else 1, p['name']))
+    related.sort(key=lambda p: (0 if p['relevance'] == 'linked' else 1 if p['relevance'] == 'exact' else 2, p['name']))
     return related[:20]
 
 
@@ -773,6 +799,229 @@ def questions_note():
     if qid:
         save_question_note(qid, note)
     return {"ok": True}
+
+
+INGEST_STATUS_FILE = UPLOAD_DIR / "status.json"
+_status_lock = threading.Lock()
+
+
+def load_ingest_status() -> dict:
+    if INGEST_STATUS_FILE.exists():
+        try:
+            return json.loads(INGEST_STATUS_FILE.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def save_ingest_status(status: dict):
+    with _status_lock:
+        INGEST_STATUS_FILE.write_text(json.dumps(status, indent=2))
+
+
+def set_file_status(filename: str, status: str, log: str = ""):
+    all_status = load_ingest_status()
+    all_status[filename] = {
+        "status": status,
+        "updated_at": datetime.datetime.now().isoformat(),
+        "log": log,
+    }
+    save_ingest_status(all_status)
+
+
+def run_ingest_background(filename: str, filepath: Path, suffix: str):
+    """Run classify + ingest pipeline in background thread."""
+    log_lines = []
+
+    def run(cmd, **kwargs):
+        result = subprocess.run(cmd, capture_output=True, text=True,
+                                cwd=str(BASE_DIR), **kwargs)
+        log_lines.append(f"$ {' '.join(str(c) for c in cmd)}")
+        log_lines.append(result.stdout[-3000:] if result.stdout else "")
+        if result.stderr:
+            log_lines.append("STDERR: " + result.stderr[-1000:])
+        return result.returncode
+
+    set_file_status(filename, "running")
+    try:
+        python = sys.executable
+
+        if suffix == ".json":
+            # classify (appends new IDs, skips existing — safe to re-run)
+            rc = run([python, "classify.py", "--input", str(filepath)])
+            if rc != 0:
+                set_file_status(filename, "error", "\n".join(log_lines))
+                return
+            # ingest
+            rc = run([python, "ingest.py"])
+            if rc != 0:
+                set_file_status(filename, "error", "\n".join(log_lines))
+                return
+
+        elif suffix == ".jsonl":
+            # Treat as a pre-classified file — run ingest directly
+            rc = run([python, "ingest.py", "--classified-file", str(filepath)])
+            if rc != 0:
+                set_file_status(filename, "error", "\n".join(log_lines))
+                return
+
+        elif suffix in (".md", ".txt"):
+            # Run through Claude to clean up, pick category/slug, format as wiki page
+            raw_content = filepath.read_text(encoding="utf-8", errors="replace")
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+            if not api_key:
+                set_file_status(filename, "error", "ANTHROPIC_API_KEY not set")
+                return
+            client = anthropic.Anthropic(api_key=api_key)
+            prompt = f"""\
+You are converting an uploaded document into a clean wiki page for a personal knowledge base.
+
+The owner is a developer/entrepreneur interested in AI systems, multi-LLM orchestration, photography, and home tech.
+
+Wiki categories: ai, projects, research, tech, personal
+
+## Rules:
+- Choose the most appropriate category from the list above
+- Choose a short snake_case slug (e.g. llm_ensemble_deliberation)
+- Remove citation artifacts like citeturn0search0, turn0search2, turn15view0 etc — strip them entirely
+- Reformat as a clean wiki page with proper headings, summary section, key points
+- First line of output MUST be: CATEGORY: <category>
+- Second line MUST be: SLUG: <slug>
+- Third line blank
+- Then the full markdown page starting with # <Category Title> / <Page Title>
+- No preamble, no explanation outside the page itself
+
+## Document to convert:
+{raw_content[:12000]}
+"""
+            msg = client.messages.create(
+                model=IMPROVE_MODEL,
+                max_tokens=4096,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result_text = msg.content[0].text.strip()
+
+            # Parse CATEGORY and SLUG from first two lines
+            lines = result_text.splitlines()
+            category, slug = "research", filepath.stem.replace("-", "_").replace(" ", "_")
+            content_start = 0
+            for i, line in enumerate(lines[:5]):
+                if line.startswith("CATEGORY:"):
+                    category = line.split(":", 1)[1].strip().lower()
+                    content_start = i + 1
+                elif line.startswith("SLUG:"):
+                    slug = line.split(":", 1)[1].strip().lower()
+                    content_start = i + 1
+
+            # Skip blank line after headers
+            while content_start < len(lines) and not lines[content_start].strip():
+                content_start += 1
+
+            page_content = "\n".join(lines[content_start:]).strip()
+
+            # Save to wiki
+            cat_dir = WIKI_DIR / category
+            cat_dir.mkdir(exist_ok=True)
+            dest = cat_dir / f"{slug}.md"
+            dest.write_text(page_content + "\n")
+            log_lines.append(f"Saved to {dest.relative_to(BASE_DIR)}")
+
+        set_file_status(filename, "done", "\n".join(log_lines))
+    except Exception as e:
+        set_file_status(filename, "error", str(e))
+
+
+@app.route("/files")
+def files_library():
+    # Core pipeline files always shown
+    core_files = []
+    for path in [CONVERSATIONS_FILE, CLASSIFIED_FILE]:
+        if path.exists():
+            stat = path.stat()
+            core_files.append({
+                "name": path.name,
+                "size": stat.st_size,
+                "mtime": datetime.datetime.fromtimestamp(stat.st_mtime),
+                "path": str(path.relative_to(BASE_DIR)),
+                "core": True,
+            })
+
+    # Uploaded files
+    all_status = load_ingest_status()
+    uploaded = []
+    for path in sorted(UPLOAD_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if path.is_file() and path.suffix in ALLOWED_EXTENSIONS:
+            stat = path.stat()
+            file_status = all_status.get(path.name, {})
+            uploaded.append({
+                "name": path.name,
+                "size": stat.st_size,
+                "mtime": datetime.datetime.fromtimestamp(stat.st_mtime),
+                "suffix": path.suffix,
+                "status": file_status.get("status", ""),
+                "status_log": file_status.get("log", ""),
+                "core": False,
+            })
+
+    return render_template("files.html", core_files=core_files, uploaded=uploaded,
+                           title="Files", active_cat=None, active_prefix=None,
+                           pages=get_wiki_pages(), grouped_pages=get_grouped_pages())
+
+
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    if "file" not in request.files:
+        return redirect(url_for("files_library"))
+    f = request.files["file"]
+    if not f.filename:
+        return redirect(url_for("files_library"))
+
+    suffix = Path(f.filename).suffix.lower()
+    if suffix not in ALLOWED_EXTENSIONS:
+        return render_template("files.html",
+                               error=f"File type '{suffix}' not allowed. Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+                               core_files=[], uploaded=[],
+                               title="Files", active_cat=None, active_prefix=None,
+                               pages=get_wiki_pages(), grouped_pages=get_grouped_pages())
+
+    filename = secure_filename(f.filename)
+    # Avoid silent overwrites — append timestamp if name already exists
+    dest = UPLOAD_DIR / filename
+    if dest.exists():
+        stem = Path(filename).stem
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{stem}_{ts}{suffix}"
+        dest = UPLOAD_DIR / filename
+
+    f.save(dest)
+    return redirect(url_for("files_library"))
+
+
+@app.route("/uploads/<filename>")
+def download_file(filename):
+    safe = secure_filename(filename)
+    return send_from_directory(UPLOAD_DIR, safe, as_attachment=True)
+
+
+@app.route("/ingest/<filename>", methods=["POST"])
+def ingest_file(filename):
+    safe = secure_filename(filename)
+    filepath = UPLOAD_DIR / safe
+    if not filepath.exists():
+        abort(404)
+    suffix = filepath.suffix.lower()
+    if suffix not in ALLOWED_EXTENSIONS:
+        abort(400)
+
+    # Don't re-run if already running
+    status = load_ingest_status().get(safe, {}).get("status", "")
+    if status == "running":
+        return redirect(url_for("files_library"))
+
+    set_file_status(safe, "queued")
+    t = threading.Thread(target=run_ingest_background, args=(safe, filepath, suffix), daemon=True)
+    t.start()
+    return redirect(url_for("files_library"))
 
 
 if __name__ == "__main__":

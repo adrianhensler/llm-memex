@@ -3,6 +3,36 @@
 
 {% block content %}
 {% if content %}
+<div class="d-flex justify-content-end mb-2">
+    <button id="copy-btn" onclick="copyPageContent()"
+        class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+        style="font-size:0.75rem; opacity:0.6; transition: opacity 0.15s"
+        onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0.6">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+            <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+        </svg>
+        <span id="copy-label">Copy</span>
+    </button>
+</div>
+<script>
+function copyPageContent() {
+    const btn = document.getElementById('copy-btn');
+    const label = document.getElementById('copy-label');
+    const text = document.querySelector('.wiki-content');
+    if (!text) return;
+    navigator.clipboard.writeText(text.innerText).then(() => {
+        label.textContent = 'Copied!';
+        btn.classList.replace('btn-outline-secondary', 'btn-success');
+        btn.style.opacity = 1;
+        setTimeout(() => {
+            label.textContent = 'Copy';
+            btn.classList.replace('btn-success', 'btn-outline-secondary');
+            btn.style.opacity = 0.6;
+        }, 1800);
+    });
+}
+</script>
 {% if toc %}
 <div class="d-flex gap-4">
     <div class="wiki-content flex-grow-1 min-width-0">

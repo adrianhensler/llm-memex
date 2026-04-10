@@ -1,4 +1,6 @@
 # Personal data — never commit
+uploads/*
+!uploads/.gitkeep
 conversations.json
 classified.jsonl
 classify_run.log

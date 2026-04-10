@@ -2,7 +2,7 @@
 
 **Turn years of LLM conversations into a searchable, self-improving personal knowledge wiki.**
 
-Point an agent at this repo with your `conversations.json` export and it will build everything described here. All prompts, data formats, and implementation details are included.
+A working implementation: drop in your `conversations.json` export, run two scripts, and browse a wiki of everything you've learned. All prompts, data formats, and implementation details are included and documented.
 
 > *"I thought 3 years of conversations with an AI tool would have value — and it does, just not in the way I expected. The value isn't the raw conversations. It's what you can synthesize from them."*
 
@@ -13,8 +13,11 @@ Point an agent at this repo with your `conversations.json` export and it will bu
 - **~1,200 wiki pages** organized by category (`ai`, `projects`, `research`, `tech`), each with Summary, Key Points, Tools & Resources, Open Questions, and Related sections
 - **3,500+ open questions** aggregated across the wiki, with a feed of recently updated ones and a place to add your own notes
 - **A Flask web app** with collapsible sidebar navigation, full-text search, per-page AI improvement, and automatic cross-referencing
-- **`[[Wiki links]]`** that resolve to actual pages with n-gram fuzzy matching
+- **`[[Wiki links]]`** that resolve to actual pages with n-gram fuzzy matching — including explicit links surfaced as related pages
 - **A living document** — pages improve over time via an Improve button that pulls in original source conversations and related wiki pages as context
+- **File upload + ingest pipeline** — upload new conversation exports or documents through the browser; status tracked with auto-refresh (queued → running → done)
+- **GitHub repo ingestion** — pull any GitHub repo's README and commit history into the wiki as a project page (`github_ingest.py`)
+- **Document import** — upload `.md` or `.txt` files; Claude cleans artifacts, picks the right category, and generates a proper wiki page
 
 ---
 
@@ -199,10 +202,10 @@ Skip entirely.
 Reads `conversations.json`, sends batches to Claude Haiku, writes `classified.jsonl`.
 
 ```bash
-uv run python3 classify.py
-uv run python3 classify.py --dry-run          # test without API calls
-uv run python3 classify.py --limit 100        # process first 100 only
-uv run python3 classify.py --batch-size 25    # conversations per API call
+python3 classify.py
+python3 classify.py --dry-run          # test without API calls
+python3 classify.py --limit 100        # process first 100 only
+python3 classify.py --batch-size 25    # conversations per API call
 ```
 
 **Resume-safe**: already-classified IDs are read from `classified.jsonl` on startup and skipped.
@@ -273,11 +276,11 @@ One JSON object per line:
 Groups classified conversations by `category/topic[0]`, synthesizes a wiki page per group.
 
 ```bash
-uv run python3 ingest.py
-uv run python3 ingest.py --dry-run          # preview without writing
-uv run python3 ingest.py --category tech    # one category only
-uv run python3 ingest.py --min-value 4      # high-value conversations only
-uv run python3 ingest.py --personal         # generate personal/ summary
+python3 ingest.py
+python3 ingest.py --dry-run          # preview without writing
+python3 ingest.py --category tech    # one category only
+python3 ingest.py --min-value 4      # high-value conversations only
+python3 ingest.py --personal         # generate personal/ summary
 ```
 
 **Resume-safe**: ingested conversation IDs are tracked in `wiki/log.md`. Interrupted runs restart where they left off.
@@ -337,8 +340,8 @@ Output is written to `wiki/{category}/{topic}.md`. Parent directories are create
 The classifier sometimes routes the same topic to multiple categories, or creates `docker_networking` and `docker-networking` as separate keys. This script finds and merges them.
 
 ```bash
-uv run python3 merge_dupes.py --dry-run   # review proposed merges
-uv run python3 merge_dupes.py             # execute merges
+python3 merge_dupes.py --dry-run   # review proposed merges
+python3 merge_dupes.py             # execute merges
 ```
 
 **Detection**: normalize all page stems (lowercase, collapse `-` and `_`). Pages with identical normalized stems are candidates. Calls Haiku to intelligently merge content, keeps the larger file as canonical, deletes the duplicate.
@@ -352,7 +355,7 @@ Always run `--dry-run` first and review before committing.
 ## Step 4: Run the Web App
 
 ```bash
-uv run python3 web/app.py
+python3 web/app.py
 # Open http://localhost:5000
 ```
 
@@ -360,15 +363,16 @@ uv run python3 web/app.py
 
 ```
 web/
-  app.py              # Flask application (~780 lines)
+  app.py              # Flask application
   templates/
     base.html         # navbar + collapsible sidebar
-    wiki.html         # page view with see-also bar and improve button
+    wiki.html         # page view with copy button, see-also bar, improve button
     wiki_category.html # category grid with prefix filter chips
     search.html       # results grouped by category
     improve.html      # improve form with options
     improve_result.html # side-by-side diff with accept/discard
     questions.html    # aggregated open questions with notes
+    files.html        # file upload library with ingest pipeline and status tracking
     index.html        # stats dashboard
   static/
     style.css         # custom styles (sidebar, cards, questions)
@@ -662,12 +666,14 @@ Typical run: ~40 pages, ~$3.00 (Sonnet + Haiku).
 |------|---------|
 | `classify.py` | Batch-classify conversations → `classified.jsonl` |
 | `ingest.py` | Synthesize wiki pages from classified conversations |
+| `github_ingest.py` | Ingest GitHub repos as wiki project pages |
 | `merge_dupes.py` | Detect and merge duplicate wiki pages |
 | `recover_topics.py` | Single-pass recovery for specific topic keys |
 | `stats.py` | Generate corpus statistics → `stats/stats.json` |
 | `schema.md` | Wiki schema: categories, page format, conventions |
+| `CLAUDE.md` | Project instructions for Claude Code sessions |
 | `web/app.py` | Flask web application |
-| `web/templates/` | Jinja2 templates |
+| `web/templates/` | Jinja2 templates (wiki, improve, files, questions) |
 | `web/static/style.css` | Custom styles |
 
 ---
@@ -698,7 +704,9 @@ A clean pipeline run (classify + ingest + dedup, no interactive improvements) co
 
 ## Future Directions
 
-- **Ingest other sources** — email, bookmarks, notes apps, Anthropic/Claude exports
+- **Claude Code session ingestion** — the session JSONL files in `~/.claude/projects/` capture recent work not in ChatGPT exports; adapting the pipeline to consume them would close the gap
+- **Background "dreaming"** — a scheduled process that autonomously improves stale pages, finds missing cross-links, and generates synthesis hub pages from clusters of related content
+- **Local-first API routing** — route LLM calls to a local Ollama instance when available, fall back to paid API; makes background jobs essentially free
 - **Embedding-based conversation selection** — find conversations most semantically relevant to a thin page rather than top-N by value score
 - **Question resolution tracking** — mark questions as answered/in-progress without AI involvement
 - **Timeline view** — how thinking on a topic evolved over time

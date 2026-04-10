@@ -197,6 +197,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Don't call API, just test pipeline")
     parser.add_argument("--batch-size", type=int, default=25, help="Conversations per API call (default: 25)")
     parser.add_argument("--limit", type=int, default=0, help="Process only N conversations (0=all)")
+    parser.add_argument("--input", type=str, default=CONVERSATIONS_FILE, help="Input conversations JSON file")
     args = parser.parse_args()
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -206,8 +207,8 @@ def main():
 
     client = anthropic.Anthropic(api_key=api_key) if not args.dry_run else None
 
-    print(f"Loading {CONVERSATIONS_FILE}...")
-    with open(CONVERSATIONS_FILE) as f:
+    print(f"Loading {args.input}...")
+    with open(args.input) as f:
         conversations = json.load(f)
 
     print(f"Total conversations: {len(conversations)}")
